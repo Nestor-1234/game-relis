@@ -43,6 +43,8 @@ class Player(GameSprite):
         self.jump_speed = -10  # зменшено швидкість стрибка (від -15 до -10)
         self.gravity = 0.5  # сила тяжіння
         self.velocity_y = 0  # вертикальна швидкість
+        self.jump_count = 0  # Лічильник стрибків
+        self.start_y = player_y  # Початкова координата Y
 
     def update(self):
         keys = key.get_pressed()
@@ -51,33 +53,45 @@ class Player(GameSprite):
         if self.is_jumping:
             self.velocity_y += self.gravity
             self.rect.y += self.velocity_y
-            if self.rect.y >= win_height - 100:  # повертається на землю
+
+            # Обмежуємо максимальну висоту стрибка 275
+            if self.rect.y <= 275:
+                self.rect.y = 275  # Не дозволяємо гравцю піднятися вище 275
+                self.velocity_y = 0
+
+            # Якщо персонаж досягає низу (землі), зупиняється
+            if self.rect.y >= win_height - 100:
                 self.rect.y = win_height - 100
                 self.is_jumping = False
                 self.velocity_y = 0
+                # Після другого стрибка повертаємо персонажа в початкову координату Y
+                if self.jump_count >= 2:
+                    self.rect.y = self.start_y
+                    self.jump_count = 0  # скидаємо лічильник стрибків
 
         # Якщо натиснута клавіша для стрибка (пробіл)
-        if keys[K_SPACE] and not self.is_jumping:
+        if keys[K_SPACE] and not self.is_jumping and self.jump_count < 2:
             self.jump()  # Викликаємо стрибок
 
         # Рух вліво
         if keys[K_a]:
-            self.rect.x -= self.speed  # Рухаємо гравця вліво
+            if self.rect.x > 0:  # Якщо гравець не виходить за ліву межу
+                self.rect.x -= self.speed  # Рухаємо гравця вліво
 
         # Рух вправо
         if keys[K_d]:
-            self.rect.x += self.speed  # Рухаємо гравця вправо
+            if self.rect.x < win_width // 2 - self.rect.width:  # Обмеження на рух вправо
+                self.rect.x += self.speed  # Рухаємо гравця вправо
 
     def jump(self):
         self.is_jumping = True
         self.velocity_y = self.jump_speed
-
+        self.jump_count += 1  # Збільшуємо лічильник стрибків
 
 # Клас для ворогів
 class Enemy(GameSprite):
     def __init__(self, player_image, player_x, player_y, size_x, size_y, player_speed):
         super().__init__(player_image, player_x, player_y, size_x, size_y, player_speed)
-        # Можемо додати різну швидкість для ворогів
         self.speed = randint(5, 15)  # випадкова швидкість ворога між 5 і 15
 
     def update(self):
@@ -86,7 +100,6 @@ class Enemy(GameSprite):
         
         # Якщо ворог виходить за межі екрану з лівої сторони, повертається на праву сторону
         if self.rect.x < -80:
-            # Встановлюємо нову координату Y для ворога в правому нижньому куті
             self.rect.x = win_width - 80  # Вороги знову з'являються з правого краю
             self.rect.y = win_height - 50  # Випадкова координата Y для ворога в нижньому куті
             lost += 1  # Збільшуємо лічильник пропущених ворогів
@@ -138,7 +151,6 @@ while run:
         if e.type == QUIT:
             run = False
         elif e.type == KEYDOWN:
-            # При натисканні пробілу викликаємо стрибок
             if e.key == K_SPACE:
                 ship.jump()  # Викликаємо стрибок
             # Перезапуск гри при натисканні клавіші "R"
