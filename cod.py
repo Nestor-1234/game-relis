@@ -10,6 +10,7 @@ img_back = "Forest.png"  # фон гри
 img_hero = "people.png"  # герой
 img_enemy = "obstacle.png"  # ворог
 img_bullet = "bullet.png"  # куля
+img_log = "log.png"  # зображення колоди (замініть на ваше зображення)
 
 # Рахунок та максимальні значення
 score = 0  # збито ворогів
@@ -37,14 +38,16 @@ class GameSprite(sprite.Sprite):
 
 # Клас для головного гравця
 class Player(GameSprite):
-    def __init__(self, player_image, player_x, player_y, size_x, size_y, player_speed):
+    def __init__(self, player_image, player_x, player_y, size_x, size_y, player_speed, lives):
         super().__init__(player_image, player_x, player_y, size_x, size_y, player_speed)
+        self.lives = lives  # додаємо кількість життів
         self.is_jumping = False  # чи в процесі стрибка
         self.jump_speed = -10  # зменшено швидкість стрибка (від -15 до -10)
         self.gravity = 0.5  # сила тяжіння
         self.velocity_y = 0  # вертикальна швидкість
         self.jump_count = 0  # Лічильник стрибків
         self.start_y = player_y  # Початкова координата Y
+        self.start_x = player_x  # Початкова координата X
 
     def update(self):
         keys = key.get_pressed()
@@ -88,6 +91,17 @@ class Player(GameSprite):
         self.velocity_y = self.jump_speed
         self.jump_count += 1  # Збільшуємо лічильник стрибків
 
+    def take_damage(self):
+        self.lives -= 1  # Зменшуємо кількість життів
+        if self.lives <= 0:
+            return True  # Якщо життя закінчились, повертаємо True
+        return False  # Якщо життя залишились, повертаємо False
+
+    def reset_position(self):
+        # Повертаємо гравця на початкові координати
+        self.rect.x = self.start_x
+        self.rect.y = self.start_y
+
 # Клас для ворогів
 class Enemy(GameSprite):
     def __init__(self, player_image, player_x, player_y, size_x, size_y, player_speed):
@@ -95,14 +109,12 @@ class Enemy(GameSprite):
         self.speed = randint(5, 15)  # випадкова швидкість ворога між 5 і 15
 
     def update(self):
-        self.rect.x -= self.speed  # Рухаємо ворога з права на ліво
-        global lost
-        
-        # Якщо ворог виходить за межі екрану з лівої сторони, повертається на праву сторону
-        if self.rect.x < -80:
-            self.rect.x = win_width - 80  # Вороги знову з'являються з правого краю
-            self.rect.y = win_height - 50  # Випадкова координата Y для ворога в нижньому куті
-            lost += 1  # Збільшуємо лічильник пропущених ворогів
+        self.rect.y += self.speed  # Вороги рухаються вниз
+
+        # Якщо ворог виходить за межі екрану, він знову з'являється зверху
+        if self.rect.y > win_height:
+            self.rect.y = 0  # Встановлюємо Y на найвищу точку екрану
+            self.rect.x = randint(0, win_width - self.rect.width)  # Випадкова X координата
 
 # Функція для скидання гри
 def restart_game():
@@ -111,9 +123,11 @@ def restart_game():
     lost = 0
     finish = False
     monsters = sprite.Group()
-    ship = Player(img_hero, 5, win_height - 100, 80, 100, 10)
-    monster1 = Enemy(img_enemy, win_width - 80, win_height - 50, 80, 50, 5)
-    monsters.add(monster1)
+    ship = Player(img_hero, 5, win_height - 100, 80, 100, 10, 3)  # додаємо 3 життя
+    # Створюємо ворогів з найвищою координатою Y (0) та випадковою X
+    monster1 = Enemy(img_enemy, randint(0, win_width - 80), 0, 80, 50, 5)  # Вороги на випадковій X
+    monster2 = Enemy(img_enemy, randint(0, win_width - 80), 0, 80, 50, 5)  # Вороги на випадковій X
+    monsters.add(monster1, monster2)
 
 # Створення вікна
 win_width = 700
@@ -123,18 +137,14 @@ window = display.set_mode((win_width, win_height))
 background = transform.scale(image.load(img_back), (win_width, win_height))
 
 # Створення спрайтів
-ship = Player(img_hero, 5, win_height - 100, 80, 100, 10)
+ship = Player(img_hero, 5, win_height - 100, 80, 100, 10, 3)  # додаємо 3 життя
 
 monsters = sprite.Group()
 
-# Збільшуємо швидкість ворогів
-enemy_speed = 5  # Збільшена швидкість для ворогів
-
-# Створення 1 ворога в правому нижньому куті
-monster1 = Enemy(img_enemy, win_width - 80, win_height - 50, 80, 50, enemy_speed)
-monsters.add(monster1)
-
-bullets = sprite.Group()
+# Створюємо ворогів з випадковими координатами X і найвищою координатою Y (0)
+monster1 = Enemy(img_enemy, randint(0, win_width - 80), 0, 80, 50, 5)  # Вороги на випадковій X
+monster2 = Enemy(img_enemy, randint(0, win_width - 80), 0, 80, 50, 5)  # Вороги на випадковій X
+monsters.add(monster1, monster2)
 
 # Завантаження музики та запуск
 mixer.music.load("musik1.mp3")  # Завантажуємо музику
@@ -145,8 +155,13 @@ mixer.music.play(-1, 0.0)  # Відтворюємо музику в циклі (
 finish = False
 run = True  # прапорець скидається кнопкою закриття вікна
 
+# Таймер для додавання нових ворогів
+spawn_timer = 0  # Початковий час для додавання нових ворогів
+
 # Основний цикл гри
 while run:
+    spawn_timer += 1  # Кожен кадр збільшуємо таймер
+
     for e in event.get():
         if e.type == QUIT:
             run = False
@@ -164,14 +179,20 @@ while run:
         score_text = font.Font(None, 36).render(f"Пропущено: {lost}", 1, (255, 255, 255))
         window.blit(score_text, (10, 20))
 
+        # Показуємо кількість життів
+        lives_text = font.Font(None, 36).render(f"Життя: {ship.lives}", 1, (255, 255, 255))
+        window.blit(lives_text, (win_width - 150, 20))
+
         # Оновлюємо спрайти
         ship.update()
         monsters.update()
 
-        # Якщо перший ворог досягає половини екрану, створюємо другого ворога
-        if monster1.rect.x <= win_width // 2 and len(monsters) == 1:
-            monster2 = Enemy(img_enemy, win_width - 80, win_height - 50, 80, 50, enemy_speed)
-            monsters.add(monster2)
+        # Додаємо нових ворогів, коли пройшов певний час
+        if spawn_timer > 500:  # Наприклад, через кожні 500 кадрів
+            spawn_timer = 0  # Скидаємо таймер
+            # Додаємо нового ворога, який з'являється зверху
+            new_enemy = Enemy(img_enemy, randint(0, win_width - 80), 0, 80, 50, 5)  # Випадкова X
+            monsters.add(new_enemy)
 
         # Малюємо спрайти
         ship.reset()
@@ -179,8 +200,14 @@ while run:
 
         # Перевірка зіткнення між монстрами і гравцем (для програшу)
         if sprite.spritecollide(ship, monsters, False):
-            finish = True
-            window.blit(lose_font, (200, 200))
+            if ship.take_damage():  # якщо життя закінчились
+                finish = True
+                # Очищуємо всі вороги
+                monsters.empty()  
+                window.blit(lose_font, (200, 200))
+            else:
+                # Повертаємо гравця на початкові координати
+                ship.reset_position()
 
         # Перемога, якщо пропущено 15 перешкод
         if lost >= goal:
