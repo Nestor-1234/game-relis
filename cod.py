@@ -20,9 +20,10 @@ lost = 0  # пропущено ворогів
 max_lost = 50  # програш, якщо пропустили стільки ворогів
 
 # Текст для виграшу та програшу
-win_font = font.Font(None, 60).render('YOU WIN!', True, (255, 255, 255))
-lose_font = font.Font(None, 60).render('YOU LOSE!', True, (180, 0, 0))
+win_font = font.Font(None, 60).render('YOU WIN!', True, (0, 0, 0))  # Чорний текст для виграшу
+lose_font = font.Font(None, 60).render('YOU LOSE!', True, (0, 0, 0))  # Чорний текст для програшу
 restart_font = font.Font(None, 36).render('R - почати заново', True, (0, 0, 0))  # Чорний текст для перезапуску
+exit_font = font.Font(None, 36).render('ESC - Вийти', True, (0, 0, 0))  # Чорний текст для виходу
 
 # Клас-батько для інших спрайтів
 class GameSprite(sprite.Sprite):
@@ -69,13 +70,17 @@ class Player(GameSprite):
     def take_damage(self):
         self.lives -= 1  # Зменшуємо кількість життів
         if self.lives <= 0:
-            return True  # Якщо життя закінчились, повертаємо True
-        return False  # Якщо життя залишились, повертаємо False
+            return True  # Якщо життя закінчилися, повертаємо True
+        return False  # Якщо життя залишилися, повертаємо False
 
     def reset_position(self):
         # Повертаємо гравця на початкові координати
         self.rect.x = win_width // 2 - self.rect.width // 2  # Центруємо по осі X
         self.rect.y = self.start_y  # Встановлюємо Y на початкову позицію
+
+    def add_life(self):
+        # Додаємо 1 життя персонажу
+        self.lives += 1
 
 # Клас для ворогів
 class Enemy(GameSprite):
@@ -97,6 +102,15 @@ class Enemy(GameSprite):
 class Heart(GameSprite):
     def __init__(self, player_image, player_x, player_y, size_x, size_y, player_speed):
         super().__init__(player_image, player_x, player_y, size_x, size_y, player_speed)
+
+    def update(self):
+        # Серце рухається вниз, як і вороги
+        self.rect.y += self.speed
+
+        # Якщо серце виходить за межі екрану, воно знову з'являється зверху
+        if self.rect.y > win_height:
+            self.rect.y = 0
+            self.rect.x = randint(0, win_width - self.rect.width)  # Випадкова X координата
 
 # Ініціалізуємо серце
 heart = None  # Спочатку немає серця
@@ -161,27 +175,28 @@ while run:
     if heart_timer >= 100:
         heart_timer = 0  # Скидаємо таймер
         # Створюємо нове серце з випадковою позицією
-        heart = Heart(heart_img, randint(0, win_width - 40), 0, 40, 40, randint(2, 5))
+        heart = Heart(heart_img, randint(0, win_width - 40), 0, 40, 40, 15)  # Збільшена швидкість серця
 
     for e in event.get():
         if e.type == QUIT:
             run = False
         elif e.type == KEYDOWN:
-            if e.key == K_SPACE:
-                ship.jump()  # Викликаємо стрибок
             # Перезапуск гри при натисканні клавіші "R"
             if e.key == K_r and finish:
                 restart_game()  # Перезапускаємо гру
+            # Вихід з гри при натисканні ESC
+            if e.key == K_ESCAPE:
+                run = False
 
     if not finish:
         window.blit(background, (0, 0))
 
         # Показуємо рахунок
-        score_text = font.Font(None, 36).render(f"Пропущено: {lost}", 1, (255, 255, 255))
+        score_text = font.Font(None, 36).render(f"Пропущено: {lost}", 1, (0, 0, 0))
         window.blit(score_text, (10, 20))
 
         # Показуємо кількість життів
-        lives_text = font.Font(None, 36).render(f"Життя: {ship.lives}", 1, (255, 255, 255))
+        lives_text = font.Font(None, 36).render(f"Життя: {ship.lives}", 1, (0, 0, 0))
         window.blit(lives_text, (win_width - 150, 20))
 
         # Оновлюємо спрайти
@@ -205,6 +220,7 @@ while run:
 
             # Перевірка на зіткнення з серцем
             if sprite.collide_rect(ship, heart):
+                ship.add_life()  # Додаємо 1 життя персонажу
                 heart = None  # Якщо зіткнулися з серцем, видаляємо його
 
         # Перевірка зіткнення з ворогами
@@ -224,6 +240,7 @@ while run:
 
         if finish:
             window.blit(restart_font, (250, 300))
+            window.blit(exit_font, (250, 350))
 
         display.update()
 
